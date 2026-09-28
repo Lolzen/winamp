@@ -1,0 +1,25 @@
+name: Linux
+
+on:
+  push:
+    paths: ['Src/Linux/**', 'Src/tagz/**', 'Src/Winamp/resource/**', 'Src/Winamp/resource.h', 'CMakeLists.txt', '.github/workflows/linux.yml']
+  pull_request:
+    paths: ['Src/Linux/**', 'Src/tagz/**', 'Src/Winamp/resource/**', 'Src/Winamp/resource.h', 'CMakeLists.txt', '.github/workflows/linux.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libgtk-3-dev libzip-dev \
+            libmpg123-dev libvorbis-dev libflac-dev libsndfile1-dev libopenmpt-dev \
+            libpulse-dev libasound2-dev
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j$(nproc)
+      - name: Self test
+        run: WINAMP_PLUGIN_DIR=$PWD/build/Plugins build/Src/Linux/wa_core_test

@@ -9,6 +9,20 @@ It really whips the llama's ass.
 
 ## Usage
 
+### Linux
+
+A native Linux version (GTK 3, classic skins, the equalizer, the playlist editor and the plug-ins) lives in [`Src/Linux`](Src/Linux/README.md). To build it:
+
+```sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+./build/winamp
+```
+
+See [Src/Linux/README.md](Src/Linux/README.md) for the dependencies, the features and what isn't ported.
+
+### Windows
+
 Building of the Winamp desktop client is currently based around Visual Studio 2019 (VS2019) and Intel IPP libs (You need to use exactly v6.1.1.035). There are different options of how to build Winamp:
 
 1. Use the `build_winampAll_2019.cmd` script file that makes 4 versions x86/x64 (Debug and Release). In this case, Visual Studio IDE is not required.

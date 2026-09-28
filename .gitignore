@@ -88,3 +88,5 @@ external_dependencies/vcpkg/
 /Src/external_dependencies/CEF
 /Src/external_dependencies/CEF.0
 /Src/external_dependencies/CEF3
+# Linux CMake build tree
+/build/

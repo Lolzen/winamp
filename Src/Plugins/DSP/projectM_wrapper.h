@@ -22,7 +22,7 @@ private:
     void RenderLoop();
 
     void* m_windowHandle;
-    projectM::PmVisualizer* m_visualizer;
+    PmVisualizer* m_visualizer;
     std::atomic<bool> m_running;
     std::thread m_renderThread;
 };

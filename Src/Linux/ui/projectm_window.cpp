@@ -54,6 +54,7 @@ std::string pending_preset;
 bool preset_load_warning_logged = false;
 unsigned int render_count = 0;
 bool render_error_logged = false;
+bool audio_block_logged = false;
 
 bool has_preset_extension(const fs::path &path)
 {
@@ -203,12 +204,24 @@ void add_projectm3_presets()
 void log_first_render_state()
 {
 	if (render_count++ != 0) return;
-	GLint framebuffer = 0;
+	GLint draw_framebuffer = 0;
+	GLint read_framebuffer = 0;
+	GLint vertex_array = 0;
+	GLint read_buffer = 0;
 	GLint viewport[4] = {0, 0, 0, 0};
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_framebuffer);
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_framebuffer);
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertex_array);
+	glGetIntegerv(GL_READ_BUFFER, &read_buffer);
 	glGetIntegerv(GL_VIEWPORT, viewport);
-	g_message("projectM: first GtkGLArea render callback; framebuffer=%d viewport=%d,%d %dx%d",
-	          framebuffer, viewport[0], viewport[1], viewport[2], viewport[3]);
+	const GLenum framebuffer_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+	g_message("projectM: first GtkGLArea render callback; draw_fbo=%d read_fbo=%d "
+	          "vao=%d read_buffer=0x%04x fbo_status=0x%04x viewport=%d,%d %dx%d",
+	          draw_framebuffer, read_framebuffer, vertex_array, read_buffer,
+	          framebuffer_status, viewport[0], viewport[1], viewport[2], viewport[3]);
+	if (framebuffer_status != GL_FRAMEBUFFER_COMPLETE)
+		g_warning("projectM: GtkGLArea framebuffer is not complete (0x%04x)",
+		          framebuffer_status);
 }
 
 void log_render_error()
@@ -342,6 +355,7 @@ void on_unrealize(GtkGLArea *gl_area, gpointer)
 	preset_load_warning_logged = false;
 	render_count = 0;
 	render_error_logged = false;
+	audio_block_logged = false;
 }
 
 void on_resize(GtkGLArea *gl_area, int width, int height, gpointer)
@@ -391,12 +405,35 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 		projectm_pcm_add_float(instance, block.samples.data(), block.frames,
 		                       block.channels == 1 ? PROJECTM_MONO : PROJECTM_STEREO);
 #else
+		if (!audio_block_logged)
+		{
+			g_message("projectM: first PCM block on render thread; channels=%u frames=%u floats=%zu first=%+.5f",
+			          block.channels, block.frames, block.samples.size(), block.samples.front());
+			audio_block_logged = true;
+		}
 		if (block.channels == 1)
 			instance->pcm()->addPCMfloat(block.samples.data(), static_cast<int>(block.frames));
 		else
-			instance->pcm()->addPCMfloat_2ch(block.samples.data(), static_cast<int>(block.frames));
+			// projectM 3 expects the number of interleaved float elements here,
+			// not the number of frames.
+			instance->pcm()->addPCMfloat_2ch(block.samples.data(),
+			                                 static_cast<int>(block.samples.size()));
 #endif
 	}
+
+// GtkGLArea renders into a private FBO, not framebuffer 0. projectM 3.1.12
+	// predates that integration pattern and may change the active FBO/viewport
+	// while rendering, so preserve and restore GTK's targets around the call.
+	GLint screen_draw_fbo = 0;
+	GLint screen_read_fbo = 0;
+	GLint screen_vao = 0;
+	GLint screen_read_buffer = 0;
+	GLint screen_viewport[4] = {0, 0, 0, 0};
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_draw_fbo);
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &screen_read_fbo);
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &screen_vao);
+	glGetIntegerv(GL_READ_BUFFER, &screen_read_buffer);
+	glGetIntegerv(GL_VIEWPORT, screen_viewport);
 
 #if defined(WINAMP_PROJECTM_API4)
 	projectm_opengl_render_frame(instance);
@@ -406,6 +443,21 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 	// a permanently black GtkGLArea.
 	instance->renderFrame();
 #endif
+
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(screen_draw_fbo));
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(screen_read_fbo));
+	glBindVertexArray(static_cast<GLuint>(screen_vao));
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glViewport(screen_viewport[0], screen_viewport[1], screen_viewport[2], screen_viewport[3]);
+	glReadBuffer(static_cast<GLenum>(screen_read_buffer));
+
+	if (render_count == 1)
+	{
+		unsigned char pixel[4] = {0, 0, 0, 0};
+		glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+		g_message("projectM: first rendered pixel RGBA=(%u,%u,%u,%u)",
+		          pixel[0], pixel[1], pixel[2], pixel[3]);
+	}
 	log_render_error();
 	return TRUE;
 }

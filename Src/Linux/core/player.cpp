@@ -19,6 +19,7 @@ int g_stopaftercur = 0;
 
 static PlayerCallbacks callbacks;
 static std::atomic<bool> info_pending(false);
+static std::atomic<bool> projectm_pcm_logged(false);
 static guint fade_timer = 0;
 static int failed_in_a_row = 0;
 
@@ -91,11 +92,15 @@ static int sa_add_cb(void *data, int timestamp, int csa)
 
 static void projectm_sa_addpcmdata(void *data, int channels, int bits, int timestamp)
 {
-	(void)timestamp;
-	// The Winamp SA callback is delivered once per 576 decoded frames by the
-	// shared input decoder. Feed the same source PCM to projectM before the
-	// optional DSP chain changes the playback buffer. This keeps the visualizer
+	// Preserve Winamp's existing spectrum analyser feed. The projectM queue is
+	// an additional consumer of the same decoded PCM and must not replace it.
+	sa_addpcmdata(data, channels, bits, timestamp);
+
+	// The shared decoder invokes SAAddPCMData once per 576 decoded frames.
+	// Feed decoded PCM before the optional DSP chain, so this remains
 	// independent of whether output is PulseAudio/PipeWire or ALSA.
+	if (!projectm_pcm_logged.exchange(true))
+		g_message("projectM: received decoded PCM; channels=%d bits=%d frames=576", channels, bits);
 	projectm_audio::push_pcm(data, channels, bits, 576);
 }
 

@@ -70,6 +70,7 @@ IF NOT EXIST .\vcpkg (
 	.\vcpkg install restclient-cpp:x86-windows-static-md restclient-cpp:x86-windows-static
 	.\vcpkg install spdlog:x86-windows-static-md
 	.\vcpkg install zlib:x86-windows-static-md zlib:x86-windows-static
+	.\vcpkg install projectm:x86-windows projectm:x64-windows
 	
 	pause
 ) ELSE (
@@ -80,6 +81,7 @@ IF NOT EXIST .\vcpkg (
 	
 	echo Patching ports...
 	xcopy /K /Y /H /C /I /E ..\vcpkg-ports\* ..\vcpkg\ports\*
+	.\vcpkg install projectm:x86-windows projectm:x64-windows
 	
 	pause
 )

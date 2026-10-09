@@ -7,6 +7,7 @@
 */
 #include "ui.h"
 #include "menu_ids.h"
+#include "projectm_window.h"
 #include "../core/player.h"
 #include "../core/playlist.h"
 
@@ -54,7 +55,8 @@ static int check_state(int id)
 	case EQ_AUTO: return config_autoload_eq;
 	case WAL_VIS_ANALYZER: return config_sa == 1;
 	case WAL_VIS_SCOPE: return config_sa == 2;
-	case WAL_VIS_OFF: return config_sa == 0;
+	case WAL_VIS_OFF: return config_sa == 0 && !projectm_window_is_visible();
+	case WAL_VIS_PROJECTM: return projectm_window_is_visible();
 	case WAL_VIS_NORMAL: return (config_safire & 3) == 0;
 	case WAL_VIS_FIRE: return (config_safire & 3) == 1;
 	case WAL_VIS_LINE: return (config_safire & 3) == 2;
@@ -204,6 +206,9 @@ static std::vector<MI> vis_menu()
 		item("&Analyzer", WAL_VIS_ANALYZER),
 		item("&Oscilloscope", WAL_VIS_SCOPE),
 		item("O&ff", WAL_VIS_OFF),
+		sep(),
+		item("projectM (MilkDrop replacement)", WAL_VIS_PROJECTM),
+		item("Next projectM preset", WAL_VIS_PROJECTM_NEXT),
 		sep(),
 		popup("Analyzer &options", {
 			item("&Normal style", WAL_VIS_NORMAL),

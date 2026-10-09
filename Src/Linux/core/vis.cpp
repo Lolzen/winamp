@@ -7,6 +7,9 @@
 ** C++ here.
 */
 #include "vis.h"
+#ifdef WINAMP_HAVE_PROJECTM
+#include "projectm_audio.h"
+#endif
 #include "config.h"
 #include "nsutil_fft.h"
 
@@ -56,6 +59,9 @@ void sa_deinit()
 {
 	std::lock_guard<std::mutex> lock(cs);
 	sa_length = 0;
+#ifdef WINAMP_HAVE_PROJECTM
+	projectm_audio::clear();
+#endif
 }
 
 int sa_add(char *values, int timestamp, int csa)
@@ -391,6 +397,10 @@ void sa_addpcmdata(void *_data_buf, int numChannels, int numBits, int ts)
 
 	if (!data_buf || numChannels < 1 || (numBits != 8 && numBits != 16 && numBits != 24 && numBits != 32))
 		return;
+
+#ifdef WINAMP_HAVE_PROJECTM
+	projectm_audio::push_pcm(_data_buf, numChannels, numBits, 576);
+#endif
 
 	switch (vis_Csa)
 	{

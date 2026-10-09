@@ -8,6 +8,7 @@
 */
 #include "ui.h"
 #include "menu_ids.h"
+#include "projectm_window.h"
 #include "mpris.h"
 #include "../core/eq.h"
 #include "../core/player.h"
@@ -435,6 +436,16 @@ void Main_OnCommand(int id)
 		return;
 
 	/* ---- classic visualizer options ---- */
+	case WAL_VIS_PROJECTM:
+		config_sa = 0;
+		sa_setmode(0);
+		projectm_window_toggle();
+		return;
+	case WAL_VIS_PROJECTM_NEXT:
+		config_sa = 0;
+		sa_setmode(0);
+		projectm_window_next_preset();
+		return;
 	case WAL_VIS_ANALYZER: config_sa = 1; sa_setmode(1); return;
 	case WAL_VIS_SCOPE: config_sa = 2; sa_setmode(2); return;
 	case WAL_VIS_OFF: config_sa = 0; sa_setmode(0); return;

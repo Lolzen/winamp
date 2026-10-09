@@ -8,8 +8,11 @@ output modules.
 
 ## Dependencies
 
-Both targets use projectM 4's C API (`projectM-4/projectM.h`). projectM must
-be built with desktop OpenGL support.
+Windows uses projectM 4's C API (`projectM-4/projectM.h`). Linux supports
+both projectM 4 and the older distribution API from projectM 3.1.12
+(`libprojectM/projectM.hpp`), so common packages such as `projectM-devel-3.1.12`
+work without a source build. projectM must be built with desktop OpenGL
+support.
 
 On Linux, install the distribution's projectM 4 development package (the
 package name varies by distribution), then build the normal Linux target:
@@ -19,7 +22,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j"$(nproc)"
 ```
 
-The CMake build looks for the `projectM-4` pkg-config module. Set
+The CMake build prefers the `projectM-4` pkg-config module and falls back to
+the `libprojectM` module used by projectM 3.1.12. Set
 `WINAMP_PROJECTM_PRESETS` to a colon-separated list of preset directories if
 the distribution installs presets somewhere non-standard.
 

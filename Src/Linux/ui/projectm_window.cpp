@@ -12,12 +12,20 @@
 #include "../core/projectm_audio.h"
 #include "ui.h"
 
+#if defined(WINAMP_PROJECTM_API4)
 #include <projectM-4/projectM.h>
+#elif defined(WINAMP_PROJECTM_API3)
+#include <libprojectM/projectM.hpp>
+#else
+#error "WINAMP_HAVE_PROJECTM requires a projectM API selection"
+#endif
 
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -27,9 +35,15 @@ namespace
 {
 namespace fs = std::filesystem;
 
+#if defined(WINAMP_PROJECTM_API4)
+using projectm_instance_t = projectm_handle;
+#else
+using projectm_instance_t = projectM *;
+#endif
+
 GtkWidget *window = nullptr;
 GtkWidget *area = nullptr;
-projectm_handle instance = nullptr;
+projectm_instance_t instance = nullptr;
 guint render_source = 0;
 std::vector<std::string> presets;
 std::vector<std::string> texture_paths;
@@ -99,15 +113,37 @@ void discover_presets()
 	presets.erase(std::unique(presets.begin(), presets.end()), presets.end());
 }
 
+#if defined(WINAMP_PROJECTM_API3)
+std::string first_existing_file(std::initializer_list<const char *> candidates)
+{
+	std::error_code ec;
+	for (const char *candidate : candidates)
+		if (fs::is_regular_file(candidate, ec)) return candidate;
+	return {};
+}
+#endif
+
 void set_texture_paths()
 {
+#if defined(WINAMP_PROJECTM_API4)
 	if (!instance || texture_paths.empty()) return;
 	std::vector<const char *> paths;
 	paths.reserve(texture_paths.size());
 	for (const std::string &path : texture_paths)
 		paths.push_back(path.c_str());
 	projectm_set_texture_search_paths(instance, paths.data(), paths.size());
+#endif
 }
+
+#if defined(WINAMP_PROJECTM_API3)
+void add_projectm3_presets()
+{
+	if (!instance) return;
+	const RatingList ratings(TOTAL_RATING_TYPES, 3);
+	for (const std::string &path : presets)
+		instance->addPresetURL(path, fs::path(path).filename().string(), ratings);
+}
+#endif
 
 void request_preset(size_t index)
 {
@@ -132,6 +168,12 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	gtk_gl_area_make_current(gl_area);
 	if (gtk_gl_area_get_error(gl_area)) return;
 
+	int width = gtk_widget_get_allocated_width(GTK_WIDGET(gl_area));
+	int height = gtk_widget_get_allocated_height(GTK_WIDGET(gl_area));
+	if (width <= 0) width = 800;
+	if (height <= 0) height = 600;
+
+#if defined(WINAMP_PROJECTM_API4)
 	instance = projectm_create();
 	if (!instance)
 	{
@@ -141,13 +183,49 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	projectm_set_fps(instance, 60);
 	projectm_set_aspect_correction(instance, true);
 	set_texture_paths();
-
-	int width = gtk_widget_get_allocated_width(GTK_WIDGET(gl_area));
-	int height = gtk_widget_get_allocated_height(GTK_WIDGET(gl_area));
-	if (width > 0 && height > 0)
-		projectm_set_window_size(instance, static_cast<size_t>(width), static_cast<size_t>(height));
+	projectm_set_window_size(instance, static_cast<size_t>(width), static_cast<size_t>(height));
 	if (!presets.empty()) request_preset(preset_index);
 	else projectm_load_preset_file(instance, "idle://", false);
+#else
+	projectM::Settings settings;
+	settings.fps = 60;
+	settings.windowWidth = width;
+	settings.windowHeight = height;
+	settings.aspectCorrection = true;
+	settings.presetDuration = 30;
+	settings.smoothPresetDuration = 3;
+	settings.presetURL = texture_paths.empty() ? std::string() : texture_paths.front();
+	settings.titleFontURL = first_existing_file({
+		"/usr/share/projectM/fonts/Vera.ttf",
+		"/usr/share/projectm/fonts/Vera.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"});
+	settings.menuFontURL = first_existing_file({
+		"/usr/share/projectM/fonts/VeraMono.ttf",
+		"/usr/share/projectm/fonts/VeraMono.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"});
+	try
+	{
+		instance = new projectM(settings);
+	}
+	catch (const std::exception &error)
+	{
+		g_warning("projectM 3 could not create an OpenGL instance: %s", error.what());
+		return;
+	}
+	catch (...)
+	{
+		g_warning("projectM 3 could not create an OpenGL instance");
+		return;
+	}
+	if (!instance)
+	{
+		g_warning("projectM 3 could not create an OpenGL instance");
+		return;
+	}
+	instance->clearPlaylist();
+	add_projectm3_presets();
+	if (!presets.empty()) request_preset(preset_index);
+#endif
 }
 
 void on_unrealize(GtkGLArea *gl_area, gpointer)
@@ -155,7 +233,11 @@ void on_unrealize(GtkGLArea *gl_area, gpointer)
 	gtk_gl_area_make_current(gl_area);
 	if (instance)
 	{
+#if defined(WINAMP_PROJECTM_API4)
 		projectm_destroy(instance);
+#else
+		delete instance;
+#endif
 		instance = nullptr;
 	}
 }
@@ -166,7 +248,13 @@ void on_resize(GtkGLArea *gl_area, int width, int height, gpointer)
 	{
 		gtk_gl_area_make_current(gl_area);
 		if (!gtk_gl_area_get_error(gl_area))
+		{
+#if defined(WINAMP_PROJECTM_API4)
 			projectm_set_window_size(instance, static_cast<size_t>(width), static_cast<size_t>(height));
+#else
+			instance->projectM_resetGL(width, height);
+#endif
+		}
 	}
 }
 
@@ -179,18 +267,35 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 	if (!pending_preset.empty())
 	{
 		const std::string path = std::move(pending_preset);
+#if defined(WINAMP_PROJECTM_API4)
 		projectm_load_preset_file(instance, path.c_str(), true);
+#else
+		(void)path;
+		instance->selectPreset(static_cast<unsigned int>(preset_index), true);
+#endif
 	}
 
 	projectm_audio::Block block;
 	while (projectm_audio::pop(block))
 	{
 		if (block.frames == 0 || block.samples.empty()) continue;
+#if defined(WINAMP_PROJECTM_API4)
 		projectm_pcm_add_float(instance, block.samples.data(), block.frames,
 		                       block.channels == 1 ? PROJECTM_MONO : PROJECTM_STEREO);
+#else
+		if (block.channels == 1)
+			instance->pcm()->addPCMfloat(block.samples.data(), static_cast<int>(block.frames));
+		else
+			instance->pcm()->addPCMfloat_2ch(block.samples.data(), static_cast<int>(block.frames));
+#endif
 	}
 
+#if defined(WINAMP_PROJECTM_API4)
 	projectm_opengl_render_frame(instance);
+#else
+	if (instance->getPlaylistSize() > 0)
+		instance->renderFrame();
+#endif
 	return TRUE;
 }
 
@@ -259,7 +364,11 @@ void ensure_window()
 		gtk_window_set_transient_for(GTK_WINDOW(window), GTK_WINDOW(g_main_wnd->Widget()));
 
 	area = gtk_gl_area_new();
+#if defined(WINAMP_PROJECTM_API4)
 	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 3, 3);
+#else
+	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 2, 1);
+#endif
 	gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(area), TRUE);
 	gtk_gl_area_set_auto_render(GTK_GL_AREA(area), FALSE);
 	gtk_widget_set_can_focus(area, TRUE);

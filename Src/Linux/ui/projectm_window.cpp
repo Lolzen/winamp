@@ -52,6 +52,8 @@ std::vector<std::string> texture_paths;
 size_t preset_index = 0;
 std::string pending_preset;
 bool preset_load_warning_logged = false;
+unsigned int render_count = 0;
+bool render_error_logged = false;
 
 bool has_preset_extension(const fs::path &path)
 {
@@ -191,6 +193,30 @@ void add_projectm3_presets()
 }
 #endif
 
+void log_first_render_state()
+{
+	if (render_count++ != 0) return;
+	GLint framebuffer = 0;
+	GLint viewport[4] = {0, 0, 0, 0};
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	g_message("projectM: first GtkGLArea render callback; framebuffer=%d viewport=%d,%d %dx%d",
+	          framebuffer, viewport[0], viewport[1], viewport[2], viewport[3]);
+}
+
+void log_render_error()
+{
+	GLenum error = GL_NO_ERROR;
+	while ((error = glGetError()) != GL_NO_ERROR)
+	{
+		if (!render_error_logged)
+		{
+			g_warning("projectM: OpenGL error after rendering: 0x%04x", error);
+			render_error_logged = true;
+		}
+	}
+}
+
 void request_preset(size_t index)
 {
 	if (presets.empty()) return;
@@ -274,8 +300,10 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 		g_warning("projectM 3 could not create an OpenGL instance");
 		return;
 	}
-	instance->clearPlaylist();
-	add_projectm3_presets();
+	// projectM 3 normally scans Settings::presetURL itself. Only populate
+	// the playlist manually when a distro build did not do that scan.
+	if (instance->getPlaylistSize() == 0)
+		add_projectm3_presets();
 	g_message("projectM 3: playlist contains %u preset files", instance->getPlaylistSize());
 	preset_load_warning_logged = false;
 	if (!presets.empty()) request_preset(preset_index);
@@ -295,6 +323,8 @@ void on_unrealize(GtkGLArea *gl_area, gpointer)
 		instance = nullptr;
 	}
 	preset_load_warning_logged = false;
+	render_count = 0;
+	render_error_logged = false;
 }
 
 void on_resize(GtkGLArea *gl_area, int width, int height, gpointer)
@@ -315,9 +345,9 @@ void on_resize(GtkGLArea *gl_area, int width, int height, gpointer)
 
 gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 {
-	gtk_gl_area_make_current(gl_area);
 	if (gtk_gl_area_get_error(gl_area)) return FALSE;
 	if (!instance) return TRUE;
+	log_first_render_state();
 
 	if (!pending_preset.empty())
 	{
@@ -359,6 +389,7 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 	// a permanently black GtkGLArea.
 	instance->renderFrame();
 #endif
+	log_render_error();
 	return TRUE;
 }
 
@@ -450,7 +481,9 @@ void ensure_window()
 	g_signal_connect(window, "destroy", G_CALLBACK(on_destroy), nullptr);
 	gtk_widget_add_events(area, GDK_KEY_PRESS_MASK);
 	gtk_widget_show_all(window);
+	gtk_window_present(GTK_WINDOW(window));
 	gtk_widget_grab_focus(area);
+	gtk_gl_area_queue_render(GTK_GL_AREA(area));
 	render_source = g_timeout_add(16, render_tick, nullptr);
 }
 }
@@ -462,7 +495,11 @@ bool projectm_window_is_visible()
 
 void projectm_window_toggle()
 {
-	if (!window) ensure_window();
+	if (!window)
+	{
+		ensure_window();
+		return;
+	}
 	if (!window) return;
 	if (projectm_window_is_visible())
 		gtk_widget_hide(window);
@@ -471,6 +508,7 @@ void projectm_window_toggle()
 		gtk_widget_show_all(window);
 		gtk_window_present(GTK_WINDOW(window));
 		if (area) gtk_widget_grab_focus(area);
+		if (area) gtk_gl_area_queue_render(GTK_GL_AREA(area));
 	}
 }
 

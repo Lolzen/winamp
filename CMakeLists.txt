@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 project(Winamp)
 
-# 1. Search for the header in standard locations
-# We remove the explicit /projectM subdirectory and let CMake search the standard paths
+# 1. Search for the projectM header
+# We search for the header file. We include /usr/include and /usr/local/include 
+# explicitly to ensure the search is exhaustive.
 find_path(PROJECTM_INCLUDE_DIR 
     NAMES PmVisualizer.h
+    PATHS /usr/include /usr/local/include /usr/include/projectM /usr/local/include/projectM
 )
 
-# 2. Search for the library using the generic name
+# 2. Search for the library
 find_library(PROJECTM_LIBRARY 
     NAMES projectM
 )

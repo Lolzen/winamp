@@ -1,39 +1,37 @@
-#pragma once
+#ifndef PROJECTM_WRAPPER_H
+#define PROJECTM_WRAPPER_H
 
-#ifdef _WIN32
-    #include <windows.h>
-#else
-    #include <X11/Xlib.h>
-    #include <GL/gl.h>
-#endif
-
-#include <projectM/projectM.h>
-#include <vector>
 #include <thread>
 #include <atomic>
 
+namespace projectM {
+    class PmVisualizer;
+}
+
 class ProjectMBridge {
 public:
-    ProjectMBridge() : m_visualizer(nullptr), m_running(false) {}
-    ~ProjectMBridge() { Shutdown(); }
+    ProjectMBridge();
+    ~ProjectMBridge();
 
-    // Use void* for the window handle to remain platform-agnostic in the interface
-    bool Initialize(void* windowHandle);
+    bool Initialize(void* winampHwnd);
     void PushAudioSamples(float* samples, int count);
     void Shutdown();
 
 private:
     void RenderLoop();
 
+    void* m_windowHandle;
     projectM::PmVisualizer* m_visualizer;
-    void* m_windowHandle; 
     std::atomic<bool> m_running;
     std::thread m_renderThread;
 };
 
+// Winamp Plugin API
 extern "C" {
-    __declspec(dllexport) void winampGetDSPPluginInfo(void* info);
-    __declspec(dllexport) int winampDSPPluginInit(void* handle);
-    __declspec(dllexport) int winampDSPPluginTerm(void* handle);
-    __declspec(dllexport) void winampDSPPluginProcess(float* buffer, int samples);
+    void winampGetDSPPluginInfo(void* info);
+    int winampDSPPluginInit(void* handle);
+    int winampDSPPluginTerm(void* handle);
+    void winampDSPPluginProcess(float* buffer, int samples);
 }
+
+#endif

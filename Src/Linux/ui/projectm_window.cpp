@@ -143,13 +143,24 @@ void discover_presets()
 
 std::string find_data_directory()
 {
+	// Use the directory that actually supplied the discovered presets first.
+	// Void Linux installs projectM 3 data below /usr/libexec/projectM, while
+	// older frontends still default to /usr/local/share/projectM.
+	if (!texture_paths.empty())
+	{
+		const fs::path first_path(texture_paths.front());
+		if (first_path.filename() == "presets" &&
+		    first_path.has_parent_path())
+			return first_path.parent_path().lexically_normal().string();
+	}
+
 	const fs::path candidates[] = {
+		"/usr/libexec/projectM",
+		"/usr/libexec/projectm",
 		"/usr/share/projectM",
 		"/usr/local/share/projectM",
 		"/usr/share/projectm",
 		"/usr/local/share/projectm",
-		"/usr/libexec/projectM",
-		"/usr/libexec/projectm",
 		fs::path(g_get_user_data_dir()) / "projectM",
 		fs::path(g_get_user_data_dir()) / "projectm"};
 
@@ -297,6 +308,9 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	settings.smoothPresetDuration = 3;
 	settings.presetURL = texture_paths.empty() ? std::string() : texture_paths.front();
 	settings.datadir = find_data_directory();
+	g_message("projectM 3: preset path=%s data directory=%s",
+	          settings.presetURL.empty() ? "(embedded idle only)" : settings.presetURL.c_str(),
+	          settings.datadir.empty() ? "(not found)" : settings.datadir.c_str());
 	settings.titleFontURL = first_existing_file({
 		"/usr/share/projectM/fonts/Vera.ttf",
 		"/usr/share/projectm/fonts/Vera.ttf",
@@ -539,6 +553,9 @@ void ensure_window()
 	// allowing a legacy 2.1 context with incomplete extension support.
 	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 3, 3);
 #endif
+	// projectM outputs opaque RGB imagery. Avoid asking GTK to composite an
+	// alpha channel whose initial value is transparent black.
+	gtk_gl_area_set_has_alpha(GTK_GL_AREA(area), FALSE);
 	gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(area), TRUE);
 	gtk_gl_area_set_has_stencil_buffer(GTK_GL_AREA(area), TRUE);
 	gtk_gl_area_set_auto_render(GTK_GL_AREA(area), FALSE);

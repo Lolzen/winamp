@@ -4,6 +4,7 @@
 #include <thread>
 #include <atomic>
 
+// Forward declaration of projectM types to keep the header clean
 namespace projectM {
     class PmVisualizer;
 }
@@ -26,12 +27,4 @@ private:
     std::thread m_renderThread;
 };
 
-// Winamp Plugin API
-extern "C" {
-    void winampGetDSPPluginInfo(void* info);
-    int winampDSPPluginInit(void* handle);
-    int winampDSPPluginTerm(void* handle);
-    void winampDSPPluginProcess(float* buffer, int samples);
-}
-
-#endif
+#endif // PROJECTM_WRAPPER_H

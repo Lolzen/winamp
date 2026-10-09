@@ -5,7 +5,7 @@
 #include <atomic>
 
 // Forward declaration of projectM types to keep the header clean
-namespace projectM {
+namespace ProjectMWrap {
     class PmVisualizer;
 }
 
@@ -22,7 +22,7 @@ private:
     void RenderLoop();
 
     void* m_windowHandle;
-    PmVisualizer* m_visualizer;
+    ProjectMWrap::PmVisualizer* m_visualizer;
     std::atomic<bool> m_running;
     std::thread m_renderThread;
 };

@@ -17,6 +17,7 @@ struct DSPPluginInfo {
     int category;
 };
 
+// Ensure the bridge uses the correct types
 ProjectMBridge* g_bridge = nullptr;
 
 ProjectMBridge::ProjectMBridge() : m_windowHandle(nullptr), m_visualizer(nullptr), m_running(false) {}

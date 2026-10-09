@@ -318,7 +318,12 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	g_message("projectM 3: playlist contains %u preset files", instance->getPlaylistSize());
 	preset_load_warning_logged = false;
 	if (!presets.empty())
-		g_message("projectM 3: retaining embedded idle preset for the first frame");
+	{
+		// The playlist now contains only portable Milkdrop presets, so the
+		// first real preset can be selected after the idle frame is initialized.
+		request_preset(preset_index);
+		g_message("projectM 3: selecting first portable preset");
+	}
 #endif
 }
 

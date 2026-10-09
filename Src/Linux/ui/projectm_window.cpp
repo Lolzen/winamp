@@ -12,7 +12,11 @@
 #include "../core/projectm_audio.h"
 #include "ui.h"
 
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES 1
+#endif
 #include <GL/gl.h>
+#include <GL/glext.h>
 
 #if defined(WINAMP_PROJECTM_API4)
 #include <projectM-4/projectM.h>

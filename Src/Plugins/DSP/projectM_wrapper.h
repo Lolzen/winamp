@@ -1,5 +1,12 @@
 #pragma once
-#include <windows.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <X11/Xlib.h>
+    #include <GL/gl.h>
+#endif
+
 #include <projectM/projectM.h>
 #include <vector>
 #include <thread>
@@ -7,10 +14,11 @@
 
 class ProjectMBridge {
 public:
-    ProjectMBridge() : m_visualizer(nullptr), m_hWnd(NULL), m_running(false) {}
+    ProjectMBridge() : m_visualizer(nullptr), m_running(false) {}
     ~ProjectMBridge() { Shutdown(); }
 
-    bool Initialize(HWND winampHwnd);
+    // Use void* for the window handle to remain platform-agnostic in the interface
+    bool Initialize(void* windowHandle);
     void PushAudioSamples(float* samples, int count);
     void Shutdown();
 
@@ -18,12 +26,11 @@ private:
     void RenderLoop();
 
     projectM::PmVisualizer* m_visualizer;
-    HWND m_hWnd;
+    void* m_windowHandle; 
     std::atomic<bool> m_running;
     std::thread m_renderThread;
 };
 
-// Winamp Plugin Interface
 extern "C" {
     __declspec(dllexport) void winampGetDSPPluginInfo(void* info);
     __declspec(dllexport) int winampDSPPluginInit(void* handle);

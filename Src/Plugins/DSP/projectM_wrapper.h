@@ -1,11 +1,16 @@
+    void* m_windowHandle;
+    PmVisualizer* m_visualizer;
+    std::atomic<bool> m_running;
+    std::thread m_renderThread;
+};
+
+#endif // PROJECTM_WRAPPER_H
+=======
 #ifndef PROJECTM_WRAPPER_H
 #define PROJECTM_WRAPPER_H
 
 #include <thread>
 #include <atomic>
-
-// Forward declaration of projectM types to keep the header clean
-// Use the actual projectM types via include in the .cpp
 
 class PmVisualizer;
 
@@ -21,12 +26,13 @@ public:
 private:
     void RenderLoop();
 
-class PmVisualizer; // Global forward declaration
-
-class ProjectMBridge {
-<<<<<<<
     void* m_windowHandle;
     PmVisualizer* m_visualizer;
+    std::atomic<bool> m_running;
+    std::thread m_renderThread;
+};
+
+#endif // PROJECTM_WRAPPER_H
 =======
     void* m_windowHandle;
     PmVisualizer* m_visualizer;

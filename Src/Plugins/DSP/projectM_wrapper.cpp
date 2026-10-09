@@ -1,4 +1,4 @@
-// projectM Wrapper Implementation
+// projectM Wrapper Implementation (Stabilized)
 #include "projectM_wrapper.h"
 #include <projectM.hpp> 
 #include <GL/gl.h>

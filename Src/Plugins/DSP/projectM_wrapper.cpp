@@ -1,5 +1,6 @@
 // projectM Wrapper Implementation (Stabilized)
 #include "projectM_wrapper.h"
+#include "dsp_projectm.h"
 #include <projectM.hpp>
 #include <projectM.hpp> 
 #include <GL/gl.h>

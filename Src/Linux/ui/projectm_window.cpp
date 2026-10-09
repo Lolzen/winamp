@@ -60,7 +60,14 @@ bool has_preset_extension(const fs::path &path)
 	std::string extension = path.extension().string();
 	std::transform(extension.begin(), extension.end(), extension.begin(),
 	               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+	#if defined(WINAMP_PROJECTM_API3)
+	// projectM 3.1.12 handles these through MilkdropPresetFactory. Its
+	// separate .so/.dylib factory is intentionally not exposed here: distro
+	// native presets are not part of Winamp's portable preset playlist.
+	return extension == ".milk" || extension == ".prjm";
+	#else
 	return extension == ".milk" || extension == ".milk2" || extension == ".prjm";
+	#endif
 }
 
 void add_unique(std::vector<std::string> &paths, const fs::path &path)
@@ -283,7 +290,11 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 		"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"});
 	try
 	{
-		instance = new projectM(settings);
+		// Keep projectM's embedded idle preset as the first frame and build a
+		// portable playlist from our own scan. Without this flag the Void
+		// package also scans native .so presets, which changes playlist indices
+		// and can select a non-portable library during startup.
+		instance = new projectM(settings, projectM::FLAG_DISABLE_PLAYLIST_LOAD);
 	}
 	catch (const std::exception &error)
 	{
@@ -300,13 +311,14 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 		g_warning("projectM 3 could not create an OpenGL instance");
 		return;
 	}
-	// projectM 3 normally scans Settings::presetURL itself. Only populate
-	// the playlist manually when a distro build did not do that scan.
-	if (instance->getPlaylistSize() == 0)
-		add_projectm3_presets();
+	// The playlist is deliberately populated from the same portable list used
+	// by the UI, so the UI index and projectM's index always refer to the same
+	// file. The embedded idle preset remains active until the user chooses one.
+	add_projectm3_presets();
 	g_message("projectM 3: playlist contains %u preset files", instance->getPlaylistSize());
 	preset_load_warning_logged = false;
-	if (!presets.empty()) request_preset(preset_index);
+	if (!presets.empty())
+		g_message("projectM 3: retaining embedded idle preset for the first frame");
 #endif
 }
 

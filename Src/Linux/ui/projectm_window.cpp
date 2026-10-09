@@ -111,6 +111,11 @@ void discover_presets()
 	add_preset_directory("/usr/share/projectM/presets");
 	add_preset_directory("/usr/local/share/projectM/presets");
 	add_preset_directory("/usr/share/projectm/presets");
+	// Void Linux packages projectM 3 presets below libexec rather than the
+	// usual share directory (projectM-3.1.12_2). Keep both spellings so the
+	// discovery remains robust across package revisions and installations.
+	add_preset_directory("/usr/libexec/projectM/presets");
+	add_preset_directory("/usr/libexec/projectm/presets");
 	add_preset_directory(fs::path(g_get_user_data_dir()) / "projectM" / "presets");
 	add_preset_directory(fs::path(g_get_user_data_dir()) / "projectm" / "presets");
 	std::sort(presets.begin(), presets.end());
@@ -129,6 +134,8 @@ std::string find_data_directory()
 		"/usr/local/share/projectM",
 		"/usr/share/projectm",
 		"/usr/local/share/projectm",
+		"/usr/libexec/projectM",
+		"/usr/libexec/projectm",
 		fs::path(g_get_user_data_dir()) / "projectM",
 		fs::path(g_get_user_data_dir()) / "projectm"};
 

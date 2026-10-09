@@ -3,6 +3,15 @@
 #include <GL/glx.h>
 #include <chrono>
 #include <iostream>
+#include <cstring>
+
+// Mock structure based on typical Winamp DSP API
+struct DSPPluginInfo {
+    char name[64];
+    char author[64];
+    int version;
+    int category;
+};
 
 ProjectMBridge* g_bridge = nullptr;
 
@@ -13,6 +22,7 @@ bool ProjectMBridge::Initialize(void* winampHwnd) {
     m_windowHandle = winampHwnd;
     try {
         m_visualizer = new projectM::PmVisualizer();
+        // In a real scenario, we'd search for the .pmpreset in the plugin folder
         m_visualizer->setPreset("default.pmpreset");
     } catch (...) {
         return false;
@@ -58,7 +68,12 @@ void ProjectMBridge::Shutdown() {
 // Winamp Plugin API
 extern "C" {
     void winampGetDSPPluginInfo(void* info) {
-        // In a real scenario, we would fill the DSPPluginInfo struct here
+        if (!info) return;
+        DSPPluginInfo* pInfo = static_cast<DSPPluginInfo*>(info);
+        strncpy(pInfo->name, "projectM Visualizer", 64);
+        strncpy(pInfo->author, "projectM Community", 64);
+        pInfo->version = 1;
+        pInfo->category = 1; // Visuals
     }
 
     int winampDSPPluginInit(void* handle) {

@@ -12,6 +12,8 @@
 #include "../core/projectm_audio.h"
 #include "ui.h"
 
+#include <GL/gl.h>
+
 #if defined(WINAMP_PROJECTM_API4)
 #include <projectM-4/projectM.h>
 #elif defined(WINAMP_PROJECTM_API3)
@@ -49,6 +51,7 @@ std::vector<std::string> presets;
 std::vector<std::string> texture_paths;
 size_t preset_index = 0;
 std::string pending_preset;
+bool preset_load_warning_logged = false;
 
 bool has_preset_extension(const fs::path &path)
 {
@@ -73,6 +76,7 @@ void add_preset_directory(const fs::path &directory)
 	if (!fs::is_directory(directory, ec)) return;
 	add_unique(texture_paths, directory);
 	add_unique(texture_paths, directory / "textures");
+	add_unique(texture_paths, directory.parent_path() / "textures");
 
 	fs::recursive_directory_iterator it(directory, fs::directory_options::skip_permission_denied, ec);
 	fs::recursive_directory_iterator end;
@@ -111,6 +115,41 @@ void discover_presets()
 	add_preset_directory(fs::path(g_get_user_data_dir()) / "projectm" / "presets");
 	std::sort(presets.begin(), presets.end());
 	presets.erase(std::unique(presets.begin(), presets.end()), presets.end());
+	if (presets.empty())
+		g_warning("projectM: no preset files found; the built-in idle preset will be used");
+	else
+		g_message("projectM: discovered %zu preset files and %zu texture search paths",
+		          presets.size(), texture_paths.size());
+}
+
+std::string find_data_directory()
+{
+	const fs::path candidates[] = {
+		"/usr/share/projectM",
+		"/usr/local/share/projectM",
+		"/usr/share/projectm",
+		"/usr/local/share/projectm",
+		fs::path(g_get_user_data_dir()) / "projectM",
+		fs::path(g_get_user_data_dir()) / "projectm"};
+
+	std::error_code ec;
+	for (const fs::path &candidate : candidates)
+		if (fs::is_directory(candidate / "presets", ec) ||
+		    fs::is_directory(candidate / "textures", ec))
+			return candidate.lexically_normal().string();
+
+	return {};
+}
+
+void log_opengl_context()
+{
+	const GLubyte *version = glGetString(GL_VERSION);
+	const GLubyte *renderer = glGetString(GL_RENDERER);
+	const GLubyte *shading_language = glGetString(GL_SHADING_LANGUAGE_VERSION);
+	g_message("projectM: OpenGL version=%s renderer=%s GLSL=%s",
+	          version ? reinterpret_cast<const char *>(version) : "unknown",
+	          renderer ? reinterpret_cast<const char *>(renderer) : "unknown",
+	          shading_language ? reinterpret_cast<const char *>(shading_language) : "unknown");
 }
 
 #if defined(WINAMP_PROJECTM_API3)
@@ -166,7 +205,12 @@ void request_relative_preset(int delta)
 void on_realize(GtkGLArea *gl_area, gpointer)
 {
 	gtk_gl_area_make_current(gl_area);
-	if (gtk_gl_area_get_error(gl_area)) return;
+	if (GError *error = gtk_gl_area_get_error(gl_area))
+	{
+		g_warning("projectM: GtkGLArea could not create an OpenGL context: %s", error->message);
+		return;
+	}
+	log_opengl_context();
 
 	int width = gtk_widget_get_allocated_width(GTK_WIDGET(gl_area));
 	int height = gtk_widget_get_allocated_height(GTK_WIDGET(gl_area));
@@ -195,6 +239,7 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	settings.presetDuration = 30;
 	settings.smoothPresetDuration = 3;
 	settings.presetURL = texture_paths.empty() ? std::string() : texture_paths.front();
+	settings.datadir = find_data_directory();
 	settings.titleFontURL = first_existing_file({
 		"/usr/share/projectM/fonts/Vera.ttf",
 		"/usr/share/projectm/fonts/Vera.ttf",
@@ -224,6 +269,8 @@ void on_realize(GtkGLArea *gl_area, gpointer)
 	}
 	instance->clearPlaylist();
 	add_projectm3_presets();
+	g_message("projectM 3: playlist contains %u preset files", instance->getPlaylistSize());
+	preset_load_warning_logged = false;
 	if (!presets.empty()) request_preset(preset_index);
 #endif
 }
@@ -240,6 +287,7 @@ void on_unrealize(GtkGLArea *gl_area, gpointer)
 #endif
 		instance = nullptr;
 	}
+	preset_load_warning_logged = false;
 }
 
 void on_resize(GtkGLArea *gl_area, int width, int height, gpointer)
@@ -272,6 +320,12 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 #else
 		(void)path;
 		instance->selectPreset(static_cast<unsigned int>(preset_index), true);
+		if (instance->getErrorLoadingCurrentPreset() && !preset_load_warning_logged)
+		{
+			g_warning("projectM 3 could not load preset %zu: %s", preset_index,
+			          presets[preset_index].c_str());
+			preset_load_warning_logged = true;
+		}
 #endif
 	}
 
@@ -293,8 +347,10 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 #if defined(WINAMP_PROJECTM_API4)
 	projectm_opengl_render_frame(instance);
 #else
-	if (instance->getPlaylistSize() > 0)
-		instance->renderFrame();
+	// projectM 3 keeps its built-in idle preset active even when the playlist
+	// is empty. Always render it so a missing preset directory cannot produce
+	// a permanently black GtkGLArea.
+	instance->renderFrame();
 #endif
 	return TRUE;
 }
@@ -367,9 +423,13 @@ void ensure_window()
 #if defined(WINAMP_PROJECTM_API4)
 	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 3, 3);
 #else
-	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 2, 1);
+	// projectM 3.1.12 uses VAOs and shader programs. Request the same
+	// desktop context level used by current projectM frontends instead of
+	// allowing a legacy 2.1 context with incomplete extension support.
+	gtk_gl_area_set_required_version(GTK_GL_AREA(area), 3, 3);
 #endif
 	gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(area), TRUE);
+	gtk_gl_area_set_has_stencil_buffer(GTK_GL_AREA(area), TRUE);
 	gtk_gl_area_set_auto_render(GTK_GL_AREA(area), FALSE);
 	gtk_widget_set_can_focus(area, TRUE);
 	gtk_container_add(GTK_CONTAINER(window), area);

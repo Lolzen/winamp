@@ -89,7 +89,7 @@ static int sa_add_cb(void *data, int timestamp, int csa)
 	return sa_add((char *)data, timestamp, csa);
 }
 
-static void sa_addpcmdata(void *data, int channels, int bits, int timestamp)
+static void projectm_sa_addpcmdata(void *data, int channels, int bits, int timestamp)
 {
 	(void)timestamp;
 	// The Winamp SA callback is delivered once per 576 decoded frames by the
@@ -113,7 +113,7 @@ void player_setup_input_module(In_Module *mod)
 {
 	mod->SAVSAInit = vissa_init;
 	mod->SAVSADeInit = vissa_deinit;
-	mod->SAAddPCMData = sa_addpcmdata;
+	mod->SAAddPCMData = projectm_sa_addpcmdata;
 	mod->SAGetMode = sa_getmode_cb;
 	mod->SAAdd = sa_add_cb;
 	mod->VSAAddPCMData = vsa_addpcmdata;

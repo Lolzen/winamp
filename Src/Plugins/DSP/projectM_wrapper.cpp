@@ -1,6 +1,8 @@
 #include "projectM_wrapper.h"
+#include <projectM/PmVisualizer.h> 
 #include <GL/gl.h>
 #include <GL/glx.h>
+#include <X11/X.h>               
 #include <chrono>
 #include <iostream>
 #include <cstring>
@@ -22,7 +24,6 @@ bool ProjectMBridge::Initialize(void* winampHwnd) {
     m_windowHandle = winampHwnd;
     try {
         m_visualizer = new projectM::PmVisualizer();
-        // In a real scenario, we'd search for the .pmpreset in the plugin folder
         m_visualizer->setPreset("default.pmpreset");
     } catch (...) {
         return false;
@@ -41,6 +42,9 @@ void ProjectMBridge::PushAudioSamples(float* samples, int count) {
 }
 
 void ProjectMBridge::RenderLoop() {
+    Display* dpy = XOpenDisplay(NULL);
+    if (!dpy) return;
+
     while (m_running) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -49,11 +53,12 @@ void ProjectMBridge::RenderLoop() {
         }
 
         if (m_windowHandle) {
-            glXSwapBuffers((GLXWindow)m_windowHandle, 0);
+            glXSwapBuffers(dpy, (GLXDrawable)m_windowHandle);
         }
         
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+    XCloseDisplay(dpy);
 }
 
 void ProjectMBridge::Shutdown() {
@@ -73,7 +78,7 @@ extern "C" {
         strncpy(pInfo->name, "projectM Visualizer", 64);
         strncpy(pInfo->author, "projectM Community", 64);
         pInfo->version = 1;
-        pInfo->category = 1; // Visuals
+        pInfo->category = 1; 
     }
 
     int winampDSPPluginInit(void* handle) {

@@ -64,6 +64,10 @@ pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 
 option(WINAMP_BUILD_PROJECTM "Build the native projectM visualizer" ON)
 if(WINAMP_BUILD_PROJECTM)
+	# projectM exposes OpenGL entry points directly; keep libGL explicit on
+	# the final executable because the pkg-config target may not propagate
+	# transitive GL dependencies under --as-needed.
+	find_package(OpenGL REQUIRED)
 	pkg_check_modules(PROJECTM4 IMPORTED_TARGET projectM-4)
 	if(PROJECTM4_FOUND)
 		set(WINAMP_PROJECTM_PKG_TARGET PkgConfig::PROJECTM4)
@@ -131,7 +135,7 @@ if(WINAMP_BUILD_PROJECTM)
 	target_compile_definitions(wa_core PRIVATE WINAMP_HAVE_PROJECTM=1)
 	target_compile_definitions(winamp PRIVATE WINAMP_HAVE_PROJECTM=1)
 	target_compile_definitions(winamp PRIVATE ${WINAMP_PROJECTM_API_DEFINE}=1)
-	target_link_libraries(winamp PRIVATE ${WINAMP_PROJECTM_PKG_TARGET})
+	target_link_libraries(winamp PRIVATE ${WINAMP_PROJECTM_PKG_TARGET} OpenGL::GL)
 endif()
 set_target_properties(winamp PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${WA_OUT})
 install(TARGETS winamp RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

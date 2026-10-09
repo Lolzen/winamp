@@ -1,24 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
 project(Winamp)
 
-# 1. Manually search for the projectM header and library
-# We add /usr/include and /usr/local/include to cover common header locations
+# 1. Search for the projectM header and library using standard paths
+# find_path and find_library automatically check /usr/local, /usr, etc.
 find_path(PROJECTM_INCLUDE_DIR 
     NAMES PmVisualizer.h 
-    PATHS /usr/include/projectM /usr/local/include/projectM /usr/include /usr/local/include
+    PATHS /usr/include/projectM /usr/local/include/projectM
 )
 
-# We explicitly include /lib64 as seen in your screenshots
 find_library(PROJECTM_LIBRARY 
-    NAMES projectM 
-    PATHS /lib64 /usr/lib64 /usr/lib /usr/local/lib
+    NAMES projectM
 )
 
 # 2. Validate that we actually found them
 if(NOT PROJECTM_INCLUDE_DIR OR NOT PROJECTM_LIBRARY)
     message(FATAL_ERROR "projectM library or headers not found. 
-    Headers searched in: ${PROJECTM_INCLUDE_DIR}
-    Library searched in: ${PROJECTM_LIBRARY}")
+    Please ensure projectm-devel is installed.")
 endif()
 
 # 3. Define the wrapper target

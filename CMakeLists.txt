@@ -1,36 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
-project(Winamp_ProjectM_Plugin)
+project(Winamp)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# ... (existing setup, dependencies, etc) ...
 
-if(UNIX AND NOT APPLE)
-    # Search for projectM library
-    find_library(PROJECTM_LIB projectM)
-    find_package(OpenGL REQUIRED)
-    
-    # X11 is required for glXSwapBuffers
-    find_library(X11_LIB X11)
+# 1. Find PkgConfig to locate projectM
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PROJECTM REQUIRED projectM)
 
-    if(NOT PROJECTM_LIB)
-        message(FATAL_ERROR "libprojectM not found. Please install projectM development packages.")
-    endif()
+# 2. Define the wrapper target
+add_library(projectM_wrapper SHARED Src/Plugins/DSP/projectM_wrapper.cpp)
 
-    add_library(projectM_wrapper SHARED Src/Plugins/DSP/projectM_wrapper.cpp)
-    
-    target_link_libraries(projectM_wrapper 
-        PRIVATE 
-        ${PROJECTM_LIB} 
-        OpenGL::GL 
-        ${X11_LIB} 
-        pthread
-    )
+# 3. FIX: Explicitly add the include directories found by pkg-config
+# This resolves the "fatal error: projectM/PmVisualizer.h: No such file"
+target_include_directories(projectM_wrapper PRIVATE ${PROJECTM_INCLUDE_DIRS})
 
-    # Ensure the output file is named correctly for Winamp to find it
-    set_target_properties(projectM_wrapper PROPERTIES 
-        OUTPUT_NAME "projectM_dsp"
-        PREFIX ""
-    )
+# 4. Link the actual projectM libraries
+target_link_libraries(projectM_wrapper PRIVATE ${PROJECTM_LIBRARIES})
 
-    message(STATUS "ProjectM Linux plugin configured. Target: projectM_wrapper (.so)")
-endif()
+# Ensure the output is a .so file for the Linux plugin system
+set_target_properties(projectM_wrapper PROPERTIES PREFIX "")

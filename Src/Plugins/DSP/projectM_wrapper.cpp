@@ -2,30 +2,30 @@
 #include <GL/gl.h>
 #include <chrono>
 
-// Global bridge instance
+#ifdef _WIN32
+    #include <windowsx.h>
+#else
+    #include <GL/glx.h>
+#endif
+
 ProjectMBridge* g_bridge = nullptr;
 
-// --- projectMBridge Implementation ---
-
-bool ProjectMBridge::Initialize(HWND winampHwnd) {
-    m_hWnd = winampHwnd;
-    
-    // Initialize projectM core
+bool ProjectMBridge::Initialize(void* winampHwnd) {
+    m_windowHandle = winampHwnd;
     m_visualizer = new projectM::PmVisualizer();
     
-    // Basic configuration: Load a default preset
+    // Default preset to ensure something renders immediately
     m_visualizer->setPreset("default.pmpreset");
     
     m_running = true;
     m_renderThread = std::thread(&ProjectMBridge::RenderLoop, this);
-    
     return true;
 }
 
 void ProjectMBridge::PushAudioSamples(float* samples, int count) {
     if (!m_visualizer) return;
     
-    // projectM expects mono samples for the FFT analysis
+    // projectM expects mono samples for its FFT analysis
     for (int i = 0; i < count; ++i) {
         m_visualizer->pushSample(samples[i]);
     }
@@ -38,9 +38,18 @@ void ProjectMBridge::RenderLoop() {
         if (m_visualizer) {
             m_visualizer->render();
         }
+
+        #ifdef _WIN32
+            SwapBuffers(GetDC((HWND)m_windowHandle));
+        #else
+            // On Linux/X11, we use glXSwapBuffers. 
+            // The windowHandle must be cast to a GLXWindow.
+            if (m_windowHandle) {
+                glXSwapBuffers((GLXWindow)m_windowHandle, 0);
+            }
+        #endif
         
-        SwapBuffers(GetDC(m_hWnd));
-        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60fps
+        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // Target ~60fps
     }
 }
 
@@ -56,11 +65,19 @@ void ProjectMBridge::Shutdown() {
 // --- Winamp Plugin Entry Points ---
 
 void winampGetDSPPluginInfo(void* info) {
-    // Map this to the Winamp DSP info struct in a real implementation
+    // Implementation would fill the Winamp-specific DSP info struct here
 }
 
 int winampDSPPluginInit(void* handle) {
-    HWND mainHwnd = GetForegroundWindow(); 
+    // For simplicity, we try to grab the active window. 
+    // In a real scenario, Winamp passes the main HWND via the handle.
+    void* mainHwnd = nullptr;
+    #ifdef _WIN32
+        mainHwnd = (void*)GetForegroundWindow();
+    #else
+        // On Linux, the handle would be provided by the Winamp core
+        mainHwnd = handle; 
+    #endif
     
     g_bridge = new ProjectMBridge();
     if (!g_bridge->Initialize(mainHwnd)) {

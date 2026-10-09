@@ -1,11 +1,12 @@
 #include "projectM_wrapper.h"
-#include <projectM/PmVisualizer.h> 
+#include <projectM.hpp> 
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <X11/X.h>               
 #include <chrono>
 #include <iostream>
 #include <cstring>
+#include <thread>
 
 // Mock structure based on typical Winamp DSP API
 struct DSPPluginInfo {
@@ -91,6 +92,14 @@ extern "C" {
         return 1; 
     }
 
+    int winampDSPPluginProcess(float* samples, int count) {
+        if (g_bridge) {
+            g_bridge->PushAudioSamples(samples, count);
+            return 1;
+        }
+        return 0;
+    }
+
     int winampDSPPluginTerm(void* handle) {
         if (g_bridge) {
             g_bridge->Shutdown();
@@ -98,11 +107,5 @@ extern "C" {
             g_bridge = nullptr;
         }
         return 0;
-    }
-
-    void winampDSPPluginProcess(float* buffer, int samples) {
-        if (g_bridge) {
-            g_bridge->PushAudioSamples(buffer, samples);
-        }
     }
 }

@@ -1,27 +1,28 @@
 cmake_minimum_required(VERSION 3.10)
 project(Winamp)
 
-# 1. Search for the projectM header and library using standard paths
-# find_path and find_library automatically check /usr/local, /usr, etc.
+# 1. Search for the header in standard locations
+# We remove the explicit /projectM subdirectory and let CMake search the standard paths
 find_path(PROJECTM_INCLUDE_DIR 
-    NAMES PmVisualizer.h 
-    PATHS /usr/include/projectM /usr/local/include/projectM
+    NAMES PmVisualizer.h
 )
 
+# 2. Search for the library using the generic name
 find_library(PROJECTM_LIBRARY 
     NAMES projectM
 )
 
-# 2. Validate that we actually found them
+# 3. Validate
 if(NOT PROJECTM_INCLUDE_DIR OR NOT PROJECTM_LIBRARY)
     message(FATAL_ERROR "projectM library or headers not found. 
-    Please ensure projectm-devel is installed.")
+    Header search found: ${PROJECTM_INCLUDE_DIR}
+    Library search found: ${PROJECTM_LIBRARY}")
 endif()
 
-# 3. Define the wrapper target
+# 4. Define the wrapper target
 add_library(projectM_wrapper SHARED Src/Plugins/DSP/projectM_wrapper.cpp)
 
-# 4. Use the found paths
+# 5. Use the found paths
 target_include_directories(projectM_wrapper PRIVATE ${PROJECTM_INCLUDE_DIR})
 target_link_libraries(projectM_wrapper PRIVATE ${PROJECTM_LIBRARY})
 

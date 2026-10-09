@@ -162,17 +162,17 @@ std::string first_existing_file(std::initializer_list<const char *> candidates)
 }
 #endif
 
+#if defined(WINAMP_PROJECTM_API4)
 void set_texture_paths()
 {
-#if defined(WINAMP_PROJECTM_API4)
 	if (!instance || texture_paths.empty()) return;
 	std::vector<const char *> paths;
 	paths.reserve(texture_paths.size());
 	for (const std::string &path : texture_paths)
 		paths.push_back(path.c_str());
 	projectm_set_texture_search_paths(instance, paths.data(), paths.size());
-#endif
 }
+#endif
 
 #if defined(WINAMP_PROJECTM_API3)
 void add_projectm3_presets()

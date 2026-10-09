@@ -47,6 +47,7 @@ add_library(wa_core STATIC
 	core/playlist.cpp
 	core/plugins.cpp
 	core/titleformat.cpp
+	core/projectm_audio.cpp
 	core/vis.cpp)
 target_include_directories(wa_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # draw_sa.cpp keeps the original one-line "if (v < 0) v = 0; if (v > 15) v = 15;" style
@@ -60,6 +61,23 @@ option(WINAMP_BUILD_GUI "Build the player (off: only the core library and plug-i
 if(WINAMP_BUILD_GUI)
 pkg_check_modules(GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
 pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
+
+option(WINAMP_BUILD_PROJECTM "Build the native projectM visualizer" ON)
+if(WINAMP_BUILD_PROJECTM)
+	# projectM exposes OpenGL entry points directly; keep libGL explicit on
+	# the final executable because the pkg-config target may not propagate
+	# transitive GL dependencies under --as-needed.
+	find_package(OpenGL REQUIRED)
+	pkg_check_modules(PROJECTM4 IMPORTED_TARGET projectM-4)
+	if(PROJECTM4_FOUND)
+		set(WINAMP_PROJECTM_PKG_TARGET PkgConfig::PROJECTM4)
+		set(WINAMP_PROJECTM_API_DEFINE WINAMP_PROJECTM_API4)
+	else()
+		pkg_check_modules(PROJECTM3 REQUIRED IMPORTED_TARGET libprojectM)
+		set(WINAMP_PROJECTM_PKG_TARGET PkgConfig::PROJECTM3)
+		set(WINAMP_PROJECTM_API_DEFINE WINAMP_PROJECTM_API3)
+	endif()
+endif()
 
 # --- built-in "Winamp Classic" skin: the original bitmaps from Src/Winamp/resource
 set(WA_SKIN_DIR ${WA_SRC}/Winamp/resource)
@@ -105,6 +123,7 @@ add_executable(winamp
 	ui/keyboard.cpp
 	ui/menus.cpp
 	ui/mpris.cpp
+	ui/projectm_window.cpp
 	ui/skin.cpp
 	ui/skinwnd.cpp
 	ui/ui_eq.cpp
@@ -112,6 +131,12 @@ add_executable(winamp
 	ui/ui_pe.cpp
 	${WA_GRESOURCE_C})
 target_link_libraries(winamp PRIVATE wa_core PkgConfig::GTK3 PkgConfig::LIBZIP)
+if(WINAMP_BUILD_PROJECTM)
+	target_compile_definitions(wa_core PRIVATE WINAMP_HAVE_PROJECTM=1)
+	target_compile_definitions(winamp PRIVATE WINAMP_HAVE_PROJECTM=1)
+	target_compile_definitions(winamp PRIVATE ${WINAMP_PROJECTM_API_DEFINE}=1)
+	target_link_libraries(winamp PRIVATE ${WINAMP_PROJECTM_PKG_TARGET} OpenGL::GL)
+endif()
 set_target_properties(winamp PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${WA_OUT})
 install(TARGETS winamp RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/winamp.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)

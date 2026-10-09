@@ -285,18 +285,33 @@ static long long latency_usec()
 	return neg ? -(long long)lat : (long long)lat;
 }
 
+static void drain_cb(pa_stream *, int, void *)
+{
+	// Wake the decoder thread after PulseAudio has played every queued sample.
+	pa_threaded_mainloop_signal(ml, 0);
+}
+
 static int IsPlaying()
 {
 	if (!stream) return 0;
 	pa_threaded_mainloop_lock(ml);
 	int r = 0;
-	if (ring_used > 0) r = 1;
+	if (ring_used > 0)
+		r = 1;
 	else
 	{
-		// make sure the tail end gets played even when the server buffer isn't full
-		pa_operation *op = pa_stream_trigger(stream, nullptr, nullptr);
-		if (op) pa_operation_unref(op);
-		r = latency_usec() > 0;
+		// A latency query includes the sink's own latency and can therefore stay
+		// positive even when this stream has no samples left. Drain the playback
+		// stream instead so the decoder receives a reliable EOF notification on
+		// both PulseAudio and pipewire-pulse.
+		pa_operation *op = pa_stream_drain(stream, drain_cb, nullptr);
+		if (op)
+		{
+			while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+				pa_threaded_mainloop_wait(ml);
+			pa_operation_unref(op);
+		}
+		r = 0;
 	}
 	pa_threaded_mainloop_unlock(ml);
 	return r;

@@ -8,6 +8,7 @@
 ** the Windows player does), through GApplication.
 */
 #include "ui/ui.h"
+#include "ui/projectm_window.h"
 #include "ui/mpris.h"
 #include "core/eq.h"
 #include "core/player.h"
@@ -227,6 +228,7 @@ static void shutdown_app(GApplication *, gpointer)
 {
 	if (!started) return;
 	config_pilp = PlayList_getPosition();
+	projectm_window_close();
 	player_shutdown();
 	PlayList_save(config_m3u_path());
 	config_write();

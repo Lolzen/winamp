@@ -5,6 +5,7 @@
 #include "eq.h"
 #include "config.h"
 #include "common.h"
+#include "projectm_audio.h"
 
 #include <glib.h>
 #include <atomic>
@@ -18,6 +19,7 @@ int g_stopaftercur = 0;
 
 static PlayerCallbacks callbacks;
 static std::atomic<bool> info_pending(false);
+static std::atomic<bool> projectm_pcm_logged(false);
 static guint fade_timer = 0;
 static int failed_in_a_row = 0;
 
@@ -88,6 +90,20 @@ static int sa_add_cb(void *data, int timestamp, int csa)
 	return sa_add((char *)data, timestamp, csa);
 }
 
+static void projectm_sa_addpcmdata(void *data, int channels, int bits, int timestamp)
+{
+	// Preserve Winamp's existing spectrum analyser feed. The projectM queue is
+	// an additional consumer of the same decoded PCM and must not replace it.
+	sa_addpcmdata(data, channels, bits, timestamp);
+
+	// The shared decoder invokes SAAddPCMData once per 576 decoded frames.
+	// Feed decoded PCM before the optional DSP chain, so this remains
+	// independent of whether output is PulseAudio/PipeWire or ALSA.
+	if (!projectm_pcm_logged.exchange(true))
+		g_message("projectM: received decoded PCM; channels=%d bits=%d frames=576", channels, bits);
+	projectm_audio::push_pcm(data, channels, bits, 576);
+}
+
 static void vsa_addpcmdata(void *, int, int, int) {}
 static int vsa_getmode(int *specNch, int *waveNch)
 {
@@ -102,7 +118,7 @@ void player_setup_input_module(In_Module *mod)
 {
 	mod->SAVSAInit = vissa_init;
 	mod->SAVSADeInit = vissa_deinit;
-	mod->SAAddPCMData = sa_addpcmdata;
+	mod->SAAddPCMData = projectm_sa_addpcmdata;
 	mod->SAGetMode = sa_getmode_cb;
 	mod->SAAdd = sa_add_cb;
 	mod->VSAAddPCMData = vsa_addpcmdata;

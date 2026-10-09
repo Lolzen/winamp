@@ -5,6 +5,7 @@
 #include "eq.h"
 #include "config.h"
 #include "common.h"
+#include "projectm_audio.h"
 
 #include <glib.h>
 #include <atomic>
@@ -86,6 +87,16 @@ static int sa_getmode_cb()
 static int sa_add_cb(void *data, int timestamp, int csa)
 {
 	return sa_add((char *)data, timestamp, csa);
+}
+
+static void sa_addpcmdata(void *data, int channels, int bits, int timestamp)
+{
+	(void)timestamp;
+	// The Winamp SA callback is delivered once per 576 decoded frames by the
+	// shared input decoder. Feed the same source PCM to projectM before the
+	// optional DSP chain changes the playback buffer. This keeps the visualizer
+	// independent of whether output is PulseAudio/PipeWire or ALSA.
+	projectm_audio::push_pcm(data, channels, bits, 576);
 }
 
 static void vsa_addpcmdata(void *, int, int, int) {}

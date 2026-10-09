@@ -5,9 +5,7 @@
 #include <atomic>
 
 // Forward declaration of projectM types to keep the header clean
-namespace ProjectMWrap {
-    class PmVisualizer;
-}
+// Use the actual projectM types via include in the .cpp
 
 class ProjectMBridge {
 public:
@@ -22,7 +20,8 @@ private:
     void RenderLoop();
 
     void* m_windowHandle;
-    ProjectMWrap::PmVisualizer* m_visualizer;
+    class PmVisualizer; // Forward declare the actual library class
+    PmVisualizer* m_visualizer;
     std::atomic<bool> m_running;
     std::thread m_renderThread;
 };

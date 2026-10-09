@@ -1,5 +1,6 @@
 // projectM Wrapper Implementation (Stabilized)
 #include "projectM_wrapper.h"
+#include <projectM.hpp>
 #include <projectM.hpp> 
 #include <GL/gl.h>
 #include <GL/glx.h>
@@ -26,7 +27,7 @@ ProjectMBridge::~ProjectMBridge() { Shutdown(); }
 bool ProjectMBridge::Initialize(void* winampHwnd) {
     m_windowHandle = winampHwnd;
     try {
-        m_visualizer = new projectM::PmVisualizer();
+        m_visualizer = new PmVisualizer();
         m_visualizer->setPreset("default.pmpreset");
     } catch (...) {
         return false;

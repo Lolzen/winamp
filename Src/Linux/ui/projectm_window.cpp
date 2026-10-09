@@ -396,6 +396,11 @@ gboolean on_render(GtkGLArea *gl_area, GdkGLContext *, gpointer)
 {
 	if (gtk_gl_area_get_error(gl_area)) return FALSE;
 	if (!instance) return TRUE;
+	// GtkGLArea may leave these tests enabled even for a color-only target.
+	// projectM 3.1.12 does not use depth/stencil/scissor tests.
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_SCISSOR_TEST);
 	log_first_render_state();
 
 	if (!pending_preset.empty())
@@ -556,8 +561,11 @@ void ensure_window()
 	// projectM outputs opaque RGB imagery. Avoid asking GTK to composite an
 	// alpha channel whose initial value is transparent black.
 	gtk_gl_area_set_has_alpha(GTK_GL_AREA(area), FALSE);
-	gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(area), TRUE);
-	gtk_gl_area_set_has_stencil_buffer(GTK_GL_AREA(area), TRUE);
+	// projectM's renderer is a 2D pipeline. GtkGLArea enables depth testing
+	// as a side effect when a depth buffer is requested, but projectM 3.1.12
+	// clears only the color target and does not need depth or stencil state.
+	gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(area), FALSE);
+	gtk_gl_area_set_has_stencil_buffer(GTK_GL_AREA(area), FALSE);
 	gtk_gl_area_set_auto_render(GTK_GL_AREA(area), FALSE);
 	gtk_widget_set_can_focus(area, TRUE);
 	gtk_container_add(GTK_CONTAINER(window), area);
